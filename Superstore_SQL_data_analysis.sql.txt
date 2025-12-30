@@ -256,20 +256,6 @@ where discount_flag = "Discounted"
 group by category 
 Order by total_profit;
 
-#convert order_date to date
-update superstore2
-set order_date = replace(order_date,'-','/'); 
-update superstore2
-set order_date = str_to_date(order_date,'%m/%d/%Y');
-alter table superstore2
-modify column order_date date;
-
-#convert ship_date to date
-update superstore2
-set ship_date = replace(ship_date,'-','/'); 
-update superstore2
-set ship_date = str_to_date(ship_date,'%m/%d/%Y');
-alter table superstore2
-modify column ship_date date;
 
 select * from superstore2;
+
