@@ -1,0 +1,275 @@
+#Create Database
+use super_schema;
+select * from superstore;
+
+
+#How many rows are there in the dataset
+select count(*) from superstore;
+
+#Create Table
+CREATE TABLE `superstore1` (
+  Row_Id int DEFAULT NULL,
+  Order_Id text,
+  Order_Date text,
+  Ship_Date text,
+  Ship_Mode text,
+  Customer_Id text,
+  Customer_Name text,
+  Segment text,
+  Country text,
+  City text,
+  State text,
+  Posta_Code int DEFAULT NULL,
+  `Region` text,
+  `Product_Id` text,
+  `Category` text,
+  `Sub_Category` text,
+  `Product_Name` text,
+  `Sales` double DEFAULT NULL,
+  `Quantity` int DEFAULT NULL,
+  `Discount` double DEFAULT NULL,
+  `Profit` double DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+select * from superstore1;
+
+insert superstore1
+select * from superstore;
+
+#Check is there any null values
+select * from superstore1
+where Order_Id is null
+or
+  Order_date is null
+or 
+  ship_Date is null
+or
+  Ship_Mode is null  
+or
+  Customer_Id is null   
+or
+  Product_Id is null     
+or
+   Sales is null 
+or
+   Quantity is null
+or
+   Discount is null
+or 
+   Profit is null;
+   
+#Check is there any duplicates or not
+With emp as(
+select *,row_number() over(partition by order_id,product_id,product_name,sales,quantity,discount,profit) as row_num
+from superstore1)
+
+select * from emp where row_num > 1;
+
+#Add row_num column permanently
+CREATE TABLE `superstore2` (
+  Row_Id int DEFAULT NULL,
+  Order_Id text,
+  Order_Date text,
+  Ship_Date text,
+  Ship_Mode text,
+  Customer_Id text,
+  Customer_Name text,
+  Segment text,
+  Country text,
+  City text,
+  State text,
+  Posta_Code int DEFAULT NULL,
+  `Region` text,
+  `Product_Id` text,
+  `Category` text,
+  `Sub_Category` text,
+  `Product_Name` text,
+  `Sales` double DEFAULT NULL,
+  `Quantity` int DEFAULT NULL,
+  `Discount` double DEFAULT NULL,
+  `Profit` double DEFAULT NULL,
+  row_num int
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+select * from superstore2;
+
+
+#Insert to the superstore2 table
+insert into superstore2
+select *,row_number() over(partition by order_id,product_id,product_name,sales,quantity,discount,profit) as row_num
+from superstore1;
+
+
+#Delete Dupicate records
+Delete from superstore2
+where row_num > 1;
+
+#convert order_date to date
+update superstore2
+set order_date = replace(order_date,'-','/'); 
+update superstore2
+set order_date = str_to_date(order_date,'%m/%d/%Y');
+alter table superstore2
+modify column order_date date;
+
+#convert ship_date to date
+update superstore2
+set ship_date = replace(ship_date,'-','/'); 
+update superstore2
+set ship_date = str_to_date(ship_date,'%m/%d/%Y');
+alter table superstore2
+modify column ship_date date;
+
+
+#Check is there any negative profit
+select profit from superstore2
+where profit<0;
+
+#How many loss records are there
+select count(*) from superstore2
+where sales > 0 and profit < 0;
+
+#What is the total sales, total profit, and total quantity sold?
+select sum(sales) as total_sales , sum(profit) as total_profit , sum(quantity) as total_quantity
+from superstore2;
+
+#What is the overall profit margin of the business?
+select sum(profit) /sum(sales) as profit_margin from superstore2;
+
+#what is the avg value 
+select avg(sales) from superstore2;
+
+select sum(sales) / count(order_id) from superstore2;
+
+#Which category generates the highest sales?
+select category , sum(sales) as total_sales from superstore2
+group by category
+order by total_sales desc 
+limit 1 ;
+
+#Which category generates the highest profit?
+select category , sum(profit) as total_profit from superstore2
+group by category
+order by total_profit desc limit 1; 
+
+#Which category has high sales but low profit margin?
+select category ,sum(sales) , sum(profit) / sum(sales) as profit_margin 
+from superstore2
+group by category
+order by sum(sales) desc , profit_margin asc;
+
+
+#Which sub-category is loss-making?
+select sub_category , sum(profit) as total_profit from superstore2
+group by sub_category having sum(profit) < 0
+order by total_profit desc;
+#What is the profit margin by category and sub-category?
+
+select category , sub_category , sum(profit) / sum(sales) as profit_margin from superstore2
+group by category , sub_category;
+
+
+
+#Which are the top 5 products by sales?
+select product_name , sum(sales) as total_sales from superstore2
+group by product_name order by total_sales desc
+limit 5;
+
+#Which are the top 5 products by profit?
+select product_name , sum(profit) as total_profit from superstore2
+group by product_name order by total_profit desc
+limit 5;
+
+#Which products have high sales but negative profit?
+select product_name,sum(sales) as total_sales , sum(profit) as total_profit
+from superstore2
+group by product_name having sum(profit) < 0
+order by total_sales desc
+limit 1;
+
+#Which products should be discontinued or repriced based on losses?
+select product_id,product_name
+,sum(profit) from superstore2
+group by product_id,product_name
+having sum(profit) < 0
+order by sum(profit) ;
+
+#Create a new column profit_status
+alter table superstore2
+add profit_status varchar(20);
+
+update superstore2
+set 
+profit_status =
+case 
+    when profit < 0 then "Discontinued"
+    else "Keep"
+end;
+
+
+select * from superstore2;
+
+#Add new column based on existing column
+alter table superstore2
+add discount_flag varchar(20);
+
+update superstore2
+set discount_flag = 
+case
+   when discount > 0 then "Discounted"
+   else "Non-Discounted"
+end;
+
+#How many orders are placed with discount vs without discount?
+select discount_flag,count(order_id) from superstore2
+group by discount_flag;
+
+#What is the total sales and profit for discounted vs non-discounted orders?
+select discount_flag,sum(sales) as total_sales , sum(profit) as total_profit from superstore2
+group by discount_flag;
+
+#Does discount increase sales volume?
+select discount_flag, sum(quantity) as total_quantity from superstore2
+group by discount_flag;
+
+#Does discount reduce overall profit?
+select discount_flag,sum(profit) as total_profit from superstore2
+group by discount_flag;
+
+#Which category suffers most loss due to discounts?
+select category , sum(profit) as total_profit
+from superstore2 
+where discount_flag = "Discounted"
+group by category
+order by sum(profit);
+
+#What is the average discount by category?
+select category , avg(discount) as avg_discount from superstore2
+group by category;
+
+
+#Is there any category where discount improves profit?
+select category,sum(profit) as total_profit 
+from superstore2
+where discount_flag = "Discounted"
+group by category 
+Order by total_profit;
+
+#convert order_date to date
+update superstore2
+set order_date = replace(order_date,'-','/'); 
+update superstore2
+set order_date = str_to_date(order_date,'%m/%d/%Y');
+alter table superstore2
+modify column order_date date;
+
+#convert ship_date to date
+update superstore2
+set ship_date = replace(ship_date,'-','/'); 
+update superstore2
+set ship_date = str_to_date(ship_date,'%m/%d/%Y');
+alter table superstore2
+modify column ship_date date;
+
+select * from superstore2;
